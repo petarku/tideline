@@ -9,7 +9,8 @@ const $ = (id) => document.getElementById(id);
 
 export class Screens {
   /**
-   * callbacks: { onPlay, onResume, onQuitToMenu, onResetSave, onQualityChange }
+   * callbacks: { onPlay, onResume, onQuitToMenu, onResetSave, onExportSave,
+   * onImportSave, onQualityChange }
    */
   constructor(callbacks) {
     this.cb = callbacks;
@@ -42,6 +43,17 @@ export class Screens {
     click("howto-back", () => this.back());
     click("settings-back", () => this.back());
     click("set-reset", () => this.confirmReset());
+    click("menu-export", () => this.cb.onExportSave());
+
+    const file = $("menu-import-file");
+    click("menu-import", () => file.click());
+    file.addEventListener("change", async () => {
+      const f = file.files[0];
+      file.value = ""; // allow re-importing the same file
+      if (!f) return;
+      if (!window.confirm("Replace your current progress with this save file?")) return;
+      this.cb.onImportSave(await f.text());
+    });
 
     const vol = $("set-volume");
     vol.addEventListener("input", () => {

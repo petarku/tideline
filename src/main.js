@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { CONFIG } from "./data/config.js";
 import { LOCATION_BY_ID } from "./data/locationData.js";
 import { S, events, machine, Phase, isGameplayPhase } from "./state/gameState.js";
-import { loadGame, saveGame, resetSave } from "./state/saveLoad.js";
+import { loadGame, saveGame, resetSave, exportSave, importSave } from "./state/saveLoad.js";
 import { audio } from "./audio/audioManager.js";
 import { createCore } from "./core/scene.js";
 import { GameClock } from "./core/time.js";
@@ -77,13 +77,27 @@ const screens = new Screens({
   },
   onResetSave: () => {
     resetSave();
-    applySettings();
-    travelTo(S.world.current, true);
-    gclock.hours = S.world.hour;
-    screens.showMenu(false);
-    if (machine.current !== Phase.MENU) machine.set(Phase.MENU);
-    hud.refreshAll();
+    reloadFromState(false);
     hud.toast("Save erased — fresh logbook ready", "warn");
+  },
+  onExportSave: () => {
+    saveGame();
+    const blob = new Blob([exportSave()], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `tideline-save-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    hud.toast("Save file exported", "success");
+  },
+  onImportSave: (text) => {
+    const res = importSave(text);
+    if (!res.ok) {
+      hud.toast(res.error, "warn");
+      return;
+    }
+    reloadFromState(true);
+    hud.toast("Save imported", "success");
   },
   onQualityChange: (q) => {
     core.setQuality(q);
@@ -91,6 +105,17 @@ const screens = new Screens({
     saveGame();
   },
 });
+
+/** Re-syncs the world, clock, HUD and menu after S was replaced wholesale. */
+function reloadFromState(hasProgress) {
+  setPaused(false); // importing/resetting from the pause menu must not leave the game frozen
+  applySettings();
+  travelTo(S.world.current, true);
+  gclock.hours = S.world.hour;
+  screens.showMenu(hasProgress);
+  if (machine.current !== Phase.MENU) machine.set(Phase.MENU);
+  hud.refreshAll();
+}
 
 const currentLoc = () => LOCATION_BY_ID[S.world.current] ?? LOCATION_BY_ID.lake;
 

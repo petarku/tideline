@@ -49,6 +49,43 @@ export function loadGame() {
   }
 }
 
+const EXPORT_TAG = "tideline-save";
+
+/** Serializes the current state into a downloadable save-file string. */
+export function exportSave() {
+  return JSON.stringify(
+    { game: EXPORT_TAG, exportedAt: new Date().toISOString(), data: S },
+    null,
+    2
+  );
+}
+
+/**
+ * Replaces the current state with a save file's contents (merged over
+ * defaults). Accepts the wrapped export format or a bare state object.
+ * Returns { ok: true } or { ok: false, error }.
+ */
+export function importSave(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return { ok: false, error: "That file isn't valid JSON." };
+  }
+  const data = parsed && parsed.game === EXPORT_TAG ? parsed.data : parsed;
+  const isObj = (v) => v && typeof v === "object" && !Array.isArray(v);
+  if (!isObj(data) || !isObj(data.profile) || !isObj(data.gear) || !isObj(data.world)) {
+    return { ok: false, error: "That doesn't look like a Tideline save file." };
+  }
+  const { money, xp, level } = data.profile;
+  if (![money, xp, level].every((n) => Number.isFinite(n) && n >= 0)) {
+    return { ok: false, error: "Save file has invalid profile values." };
+  }
+  assignState(deepMerge(createDefaultState(), data));
+  saveGame();
+  return { ok: true };
+}
+
 export function resetSave() {
   if (storageOk) {
     try {
